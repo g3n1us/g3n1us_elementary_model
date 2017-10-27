@@ -47,19 +47,20 @@ Animal.where('legs', '>=', 4).then((response) => {
 });
 ```
 ### Other operators
-
-|`'='`       |equals                     |
-|`'>'`       |greater than               |
-|`'<'`       |less than                  |
-|`'>='`      |greater than or equal to   |
-|`'<='`      |less than or equal to      |
-|`'exists'`  |exists/not null            |
-|`'!='`      |not equal to               |
-|`'<>'`      |not equal to               |
-|`'in'`      |in array                   |
-|`'!in'`     |not in array               |
-|`'out'`     |not in array               |
-|`'regex'`   |matches regular expression |
+|             |                             |
+| ----------- | --------------------------- |
+| `'='`       | equals                      |
+| `'>'`       | greater than                |
+| `'<'`       | less than                   |
+| `'>='`      | greater than or equal to    |
+| `'<='`      | less than or equal to       |
+| `'exists'`  | exists/not null             |
+| `'!='`      | not equal to                |
+| `'<>'`      | not equal to                |
+| `'in'`      | in array                    |
+| `'!in'`     | not in array                |
+| `'out'`     | not in array                |
+| `'regex'`   | matches regular expression  |
              
 > Note, this is always the operator if a regex is provided as the query argument
 
