@@ -24,28 +24,56 @@ g3n1us.Container.add_model(Animal);
 
 `````
 
-### Querying
+## Querying
 Querying is done against a static instance of your model
 
-#### Find an item by it's id
+### Find an item by it's `id`
 ```javascript
 Animal.find('187').then(animal => {
   console.log('I found the animal! ' + animal);
 });
 ```
 
-#### Query for items by attribute
+### Query for items by attribute
 ```javascript
 Animal.where('has_fur', true).then((response) => {
   console.log('Animals are now inside the plural form of the model name: response.animals = ', response.animals);
 });
 ```
 
-#### Don't like Promises?!
+```javascript
+Animal.where('legs', '>=', 4).then((response) => {
+  console.log('Only four or more legs: response.animals = ', response.animals);
+});
+```
+### Other operators
+
+`'='`: equals
+`'>'`: greater than
+`'<'`: less than
+`'>='`: greater than or equal to
+`'<='`: less than or equal to
+`'exists'`: exists/not null
+`'!='`: not equal to
+`'<>'`: not equal to
+`'in'`: in array
+`'!in'`: not in array
+`'out'`: not in array
+`'regex'`: matches regular expression
+> Note, this is always the operator if a regex is provided as the query argument
+
+
+> Don't like Promises?!
 All query methods can also accept a callback as the last argument
 ```javascript
 Animal.find('187', function(animal){
   console.log('I found the animal! ' + animal);
 });
 ```
+
+### Relations
+> TODO
+
+### Saving Models
+> TODO
 
