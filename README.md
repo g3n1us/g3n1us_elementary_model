@@ -64,6 +64,7 @@ Animal.where('legs', '>=', 4).then((response) => {
              
 > Note, this is always the operator if a regex is provided as the query argument
 
+_____
 
 > Don't like Promises?!
 All query methods can also accept a callback as the last argument
