@@ -4,6 +4,9 @@ import helpers from 'g3n1us_helpers';
 import PouchDB from 'pouchdb';
 import PouchDBFind from 'pouchdb-find';
 import RelationalPouch from 'relational-pouch';
+import config from '../.env'; // What would I use this for??
+import pluralize from 'pluralize';
+
 PouchDB.plugin(PouchDBFind);
 PouchDB.plugin(RelationalPouch);
 
@@ -37,9 +40,10 @@ export class App extends Connection{
 	
 	
 	shouldRefresh(){
-		return true;
-		var refreshed_at = localStorage.g3n1us_db_refreshed_at
-			? new Date(localStorage.g3n1us_db_refreshed_at)
+// 		return true;
+		var refreshed_at_key = 'g3n1us_db_refreshed_at_' + this.handle;
+		var refreshed_at = localStorage[refreshed_at_key]
+			? new Date(localStorage[refreshed_at_key])
 			: new Date(null);
 		var stale_at = refreshed_at.setMonth(refreshed_at.getMonth() + 1); // one month
 		
@@ -53,12 +57,14 @@ export class App extends Connection{
 	
 	// Data is older than set maxAge, so replenish the local DB from the API endpoint
 	getApi(){
+  	console.warn('Refreshing data from the api');
 		return new Promise((resolve, reject) => {
 			var all_docs = this.constructor.all();
+			let headers = this.headers || {};
 			var api_call = $.ajax({
 				url: this.connection.endpoint,
 				type: "GET",
-				headers: {}
+				headers: headers
 			});
 			
 			Promise.all([api_call, all_docs]).then((values) => {
@@ -74,8 +80,8 @@ export class App extends Connection{
 						v.rev = rev_map[v.id];
 					return v;
 				});
-
-					localStorage.g3n1us_db_refreshed_at = new Date;
+      		var refreshed_at_key = 'g3n1us_db_refreshed_at_' + this.handle;
+					localStorage[refreshed_at_key] = new Date;
 					this.saveMany(alldata);
 				
 			});
@@ -84,6 +90,7 @@ export class App extends Connection{
 	
 	// Data is within the set maxAge, so pull from local DB.
 	getDb(){
+  	console.warn('Data is FRESH!! Get from DB.');
 		return this.connection.db.allDocs({
 			include_docs: true,
 			attachments: true
@@ -106,7 +113,6 @@ export class App extends Connection{
 		});		
 	}
 	
-	
 } // close Class
 
 
@@ -115,11 +121,14 @@ export class App extends Connection{
 export class Container{
 
   static add_model(model){
-    if(!model._initialized)
+    if(!model._initialized){
       model = new model;
+    }
     else{
       this.models = this.models || {};
-      this.models[model.handle] = model.schema;        
+      this.models[model.handle] = model.schema;  
+      this.model_instances = this.model_instances || {};
+      this.model_instances[model.handle] = model;    
     }
   }
   
@@ -133,6 +142,9 @@ export class Container{
       return this;
     this.db.setSchema(this.full_schema);
     this._schema_set = true;
+    for(let i in this.model_instances)
+      this.model_instances[i].boot();
+    
     return this;
   }
 }
@@ -234,6 +246,7 @@ export class Model extends QueryBuilder{
     this._initialized = true;
     this._defaults = {};
     this._data = data;
+    this.headers = {};
     Container.add_model(this);
     return new Proxy(this, this);
   }
@@ -242,7 +255,8 @@ export class Model extends QueryBuilder{
   get schema(){
     let schema = {
       singular: this.handle,
-      plural: this.handle + 's', // obviously this is shitty
+      plural:  pluralize(this.handle), // obviously this is shitty
+//       plural:  pluralizethis.handle + 's', // obviously this is shitty
     };
     if(Object.values(this.relations).length)
       schema.relations = this.relations;
@@ -273,9 +287,13 @@ export class Model extends QueryBuilder{
             resolve(Container.db.rel.save(this.handle, merged));
           }
           else{
+            resolve(Container.db.rel.save(this.handle, save_data));
+/*
+            console.log(this);
             debugger;
-            console.log(this)
+            
             reject('The model to be saved could not be located');  
+*/
           }
             
         }).catch(reason => { 
@@ -299,7 +317,7 @@ export class Model extends QueryBuilder{
       return this.save(v);
     });
     var promise = Promise.all(promises).then(values => {
-      console.log(values);
+      console.log(values); // needs an output return value of some kind. What should this be??
     }).catch(reason => { 
       console.log(reason)
     });
