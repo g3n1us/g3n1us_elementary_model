@@ -1,0 +1,25 @@
+{
+  "name": "g3n1us_localapi",
+  "version": "0.0.6",
+  "description": "Import APIs into a local PouchDB and provide querying and models",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "webpack",
+    "watch": "webpack --watch=true"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "es6-promise": "^4.1.1",
+    "g3n1us_helpers": "^1.0.4",
+    "jquery": "^3.2.1",
+    "pluralize": "^7.0.0",
+    "pouchdb": "^6.3.4",
+    "relational-pouch": "git+https://github.com/g3n1us/relational-pouch.git"
+  },
+  "devDependencies": {
+    "webpack": "^3.8.1"
+  }
+}

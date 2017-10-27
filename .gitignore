@@ -1,0 +1,8 @@
+node_modules
+index.html
+npm-debug.log
+.env
+.DS_Store
+worker.js
+
+
