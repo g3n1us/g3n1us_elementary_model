@@ -61,7 +61,7 @@ var g3n1us =
 /******/ 	__webpack_require__.p = "";
 /******/
 /******/ 	// Load entry module and return exports
-/******/ 	return __webpack_require__(__webpack_require__.s = 18);
+/******/ 	return __webpack_require__(__webpack_require__.s = 19);
 /******/ })
 /************************************************************************/
 /******/ ([
@@ -354,7 +354,7 @@ process.umask = function() { return 0; };
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_5_inherits___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_5_inherits__);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_6_immediate__ = __webpack_require__(5);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_6_immediate___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_6_immediate__);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_7_pouchdb_errors__ = __webpack_require__(30);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_7_pouchdb_errors__ = __webpack_require__(31);
 /* harmony reexport (default from non-hamory) */ __webpack_require__.d(__webpack_exports__, "f", function() { return __WEBPACK_IMPORTED_MODULE_6_immediate___default.a; });
 
 
@@ -1781,8 +1781,8 @@ function numToIndexableString(num) {
 /* 9 */
 /***/ (function(module, exports, __webpack_require__) {
 
-var v1 = __webpack_require__(24);
-var v4 = __webpack_require__(25);
+var v1 = __webpack_require__(25);
+var v4 = __webpack_require__(26);
 
 var uuid = v4;
 uuid.v1 = v1;
@@ -3193,8 +3193,8 @@ function isUndefined(arg) {
 Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
 /* WEBPACK VAR INJECTION */(function(process) {/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_pouchdb_utils__ = __webpack_require__(3);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_1_pouchdb_promise__ = __webpack_require__(4);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2_pouchdb_selector_core__ = __webpack_require__(31);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3_pouchdb_abstract_mapreduce__ = __webpack_require__(32);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2_pouchdb_selector_core__ = __webpack_require__(32);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3_pouchdb_abstract_mapreduce__ = __webpack_require__(33);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_4_pouchdb_collate__ = __webpack_require__(8);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_5_pouchdb_md5__ = __webpack_require__(17);
 
@@ -4834,24 +4834,525 @@ function stringMd5(string) {
 
 /***/ }),
 /* 18 */
+/***/ (function(module, exports, __webpack_require__) {
+
+/* global define */
+
+(function (root, pluralize) {
+  /* istanbul ignore else */
+  if (true) {
+    // Node.
+    module.exports = pluralize();
+  } else if (typeof define === 'function' && define.amd) {
+    // AMD, registers as an anonymous module.
+    define(function () {
+      return pluralize();
+    });
+  } else {
+    // Browser global.
+    root.pluralize = pluralize();
+  }
+})(this, function () {
+  // Rule storage - pluralize and singularize need to be run sequentially,
+  // while other rules can be optimized using an object for instant lookups.
+  var pluralRules = [];
+  var singularRules = [];
+  var uncountables = {};
+  var irregularPlurals = {};
+  var irregularSingles = {};
+
+  /**
+   * Sanitize a pluralization rule to a usable regular expression.
+   *
+   * @param  {(RegExp|string)} rule
+   * @return {RegExp}
+   */
+  function sanitizeRule (rule) {
+    if (typeof rule === 'string') {
+      return new RegExp('^' + rule + '$', 'i');
+    }
+
+    return rule;
+  }
+
+  /**
+   * Pass in a word token to produce a function that can replicate the case on
+   * another word.
+   *
+   * @param  {string}   word
+   * @param  {string}   token
+   * @return {Function}
+   */
+  function restoreCase (word, token) {
+    // Tokens are an exact match.
+    if (word === token) return token;
+
+    // Upper cased words. E.g. "HELLO".
+    if (word === word.toUpperCase()) return token.toUpperCase();
+
+    // Title cased words. E.g. "Title".
+    if (word[0] === word[0].toUpperCase()) {
+      return token.charAt(0).toUpperCase() + token.substr(1).toLowerCase();
+    }
+
+    // Lower cased words. E.g. "test".
+    return token.toLowerCase();
+  }
+
+  /**
+   * Interpolate a regexp string.
+   *
+   * @param  {string} str
+   * @param  {Array}  args
+   * @return {string}
+   */
+  function interpolate (str, args) {
+    return str.replace(/\$(\d{1,2})/g, function (match, index) {
+      return args[index] || '';
+    });
+  }
+
+  /**
+   * Replace a word using a rule.
+   *
+   * @param  {string} word
+   * @param  {Array}  rule
+   * @return {string}
+   */
+  function replace (word, rule) {
+    return word.replace(rule[0], function (match, index) {
+      var result = interpolate(rule[1], arguments);
+
+      if (match === '') {
+        return restoreCase(word[index - 1], result);
+      }
+
+      return restoreCase(match, result);
+    });
+  }
+
+  /**
+   * Sanitize a word by passing in the word and sanitization rules.
+   *
+   * @param  {string}   token
+   * @param  {string}   word
+   * @param  {Array}    rules
+   * @return {string}
+   */
+  function sanitizeWord (token, word, rules) {
+    // Empty string or doesn't need fixing.
+    if (!token.length || uncountables.hasOwnProperty(token)) {
+      return word;
+    }
+
+    var len = rules.length;
+
+    // Iterate over the sanitization rules and use the first one to match.
+    while (len--) {
+      var rule = rules[len];
+
+      if (rule[0].test(word)) return replace(word, rule);
+    }
+
+    return word;
+  }
+
+  /**
+   * Replace a word with the updated word.
+   *
+   * @param  {Object}   replaceMap
+   * @param  {Object}   keepMap
+   * @param  {Array}    rules
+   * @return {Function}
+   */
+  function replaceWord (replaceMap, keepMap, rules) {
+    return function (word) {
+      // Get the correct token and case restoration functions.
+      var token = word.toLowerCase();
+
+      // Check against the keep object map.
+      if (keepMap.hasOwnProperty(token)) {
+        return restoreCase(word, token);
+      }
+
+      // Check against the replacement map for a direct word replacement.
+      if (replaceMap.hasOwnProperty(token)) {
+        return restoreCase(word, replaceMap[token]);
+      }
+
+      // Run all the rules against the word.
+      return sanitizeWord(token, word, rules);
+    };
+  }
+
+  /**
+   * Check if a word is part of the map.
+   */
+  function checkWord (replaceMap, keepMap, rules, bool) {
+    return function (word) {
+      var token = word.toLowerCase();
+
+      if (keepMap.hasOwnProperty(token)) return true;
+      if (replaceMap.hasOwnProperty(token)) return false;
+
+      return sanitizeWord(token, token, rules) === token;
+    };
+  }
+
+  /**
+   * Pluralize or singularize a word based on the passed in count.
+   *
+   * @param  {string}  word
+   * @param  {number}  count
+   * @param  {boolean} inclusive
+   * @return {string}
+   */
+  function pluralize (word, count, inclusive) {
+    var pluralized = count === 1
+      ? pluralize.singular(word) : pluralize.plural(word);
+
+    return (inclusive ? count + ' ' : '') + pluralized;
+  }
+
+  /**
+   * Pluralize a word.
+   *
+   * @type {Function}
+   */
+  pluralize.plural = replaceWord(
+    irregularSingles, irregularPlurals, pluralRules
+  );
+
+  /**
+   * Check if a word is plural.
+   *
+   * @type {Function}
+   */
+  pluralize.isPlural = checkWord(
+    irregularSingles, irregularPlurals, pluralRules
+  );
+
+  /**
+   * Singularize a word.
+   *
+   * @type {Function}
+   */
+  pluralize.singular = replaceWord(
+    irregularPlurals, irregularSingles, singularRules
+  );
+
+  /**
+   * Check if a word is singular.
+   *
+   * @type {Function}
+   */
+  pluralize.isSingular = checkWord(
+    irregularPlurals, irregularSingles, singularRules
+  );
+
+  /**
+   * Add a pluralization rule to the collection.
+   *
+   * @param {(string|RegExp)} rule
+   * @param {string}          replacement
+   */
+  pluralize.addPluralRule = function (rule, replacement) {
+    pluralRules.push([sanitizeRule(rule), replacement]);
+  };
+
+  /**
+   * Add a singularization rule to the collection.
+   *
+   * @param {(string|RegExp)} rule
+   * @param {string}          replacement
+   */
+  pluralize.addSingularRule = function (rule, replacement) {
+    singularRules.push([sanitizeRule(rule), replacement]);
+  };
+
+  /**
+   * Add an uncountable word rule.
+   *
+   * @param {(string|RegExp)} word
+   */
+  pluralize.addUncountableRule = function (word) {
+    if (typeof word === 'string') {
+      uncountables[word.toLowerCase()] = true;
+      return;
+    }
+
+    // Set singular and plural references for the word.
+    pluralize.addPluralRule(word, '$0');
+    pluralize.addSingularRule(word, '$0');
+  };
+
+  /**
+   * Add an irregular word definition.
+   *
+   * @param {string} single
+   * @param {string} plural
+   */
+  pluralize.addIrregularRule = function (single, plural) {
+    plural = plural.toLowerCase();
+    single = single.toLowerCase();
+
+    irregularSingles[single] = plural;
+    irregularPlurals[plural] = single;
+  };
+
+  /**
+   * Irregular rules.
+   */
+  [
+    // Pronouns.
+    ['I', 'we'],
+    ['me', 'us'],
+    ['he', 'they'],
+    ['she', 'they'],
+    ['them', 'them'],
+    ['myself', 'ourselves'],
+    ['yourself', 'yourselves'],
+    ['itself', 'themselves'],
+    ['herself', 'themselves'],
+    ['himself', 'themselves'],
+    ['themself', 'themselves'],
+    ['is', 'are'],
+    ['was', 'were'],
+    ['has', 'have'],
+    ['this', 'these'],
+    ['that', 'those'],
+    // Words ending in with a consonant and `o`.
+    ['echo', 'echoes'],
+    ['dingo', 'dingoes'],
+    ['volcano', 'volcanoes'],
+    ['tornado', 'tornadoes'],
+    ['torpedo', 'torpedoes'],
+    // Ends with `us`.
+    ['genus', 'genera'],
+    ['viscus', 'viscera'],
+    // Ends with `ma`.
+    ['stigma', 'stigmata'],
+    ['stoma', 'stomata'],
+    ['dogma', 'dogmata'],
+    ['lemma', 'lemmata'],
+    ['schema', 'schemata'],
+    ['anathema', 'anathemata'],
+    // Other irregular rules.
+    ['ox', 'oxen'],
+    ['axe', 'axes'],
+    ['die', 'dice'],
+    ['yes', 'yeses'],
+    ['foot', 'feet'],
+    ['eave', 'eaves'],
+    ['goose', 'geese'],
+    ['tooth', 'teeth'],
+    ['quiz', 'quizzes'],
+    ['human', 'humans'],
+    ['proof', 'proofs'],
+    ['carve', 'carves'],
+    ['valve', 'valves'],
+    ['looey', 'looies'],
+    ['thief', 'thieves'],
+    ['groove', 'grooves'],
+    ['pickaxe', 'pickaxes'],
+    ['whiskey', 'whiskies']
+  ].forEach(function (rule) {
+    return pluralize.addIrregularRule(rule[0], rule[1]);
+  });
+
+  /**
+   * Pluralization rules.
+   */
+  [
+    [/s?$/i, 's'],
+    [/[^\u0000-\u007F]$/i, '$0'],
+    [/([^aeiou]ese)$/i, '$1'],
+    [/(ax|test)is$/i, '$1es'],
+    [/(alias|[^aou]us|tlas|gas|ris)$/i, '$1es'],
+    [/(e[mn]u)s?$/i, '$1s'],
+    [/([^l]ias|[aeiou]las|[emjzr]as|[iu]am)$/i, '$1'],
+    [/(alumn|syllab|octop|vir|radi|nucle|fung|cact|stimul|termin|bacill|foc|uter|loc|strat)(?:us|i)$/i, '$1i'],
+    [/(alumn|alg|vertebr)(?:a|ae)$/i, '$1ae'],
+    [/(seraph|cherub)(?:im)?$/i, '$1im'],
+    [/(her|at|gr)o$/i, '$1oes'],
+    [/(agend|addend|millenni|dat|extrem|bacteri|desiderat|strat|candelabr|errat|ov|symposi|curricul|automat|quor)(?:a|um)$/i, '$1a'],
+    [/(apheli|hyperbat|periheli|asyndet|noumen|phenomen|criteri|organ|prolegomen|hedr|automat)(?:a|on)$/i, '$1a'],
+    [/sis$/i, 'ses'],
+    [/(?:(kni|wi|li)fe|(ar|l|ea|eo|oa|hoo)f)$/i, '$1$2ves'],
+    [/([^aeiouy]|qu)y$/i, '$1ies'],
+    [/([^ch][ieo][ln])ey$/i, '$1ies'],
+    [/(x|ch|ss|sh|zz)$/i, '$1es'],
+    [/(matr|cod|mur|sil|vert|ind|append)(?:ix|ex)$/i, '$1ices'],
+    [/(m|l)(?:ice|ouse)$/i, '$1ice'],
+    [/(pe)(?:rson|ople)$/i, '$1ople'],
+    [/(child)(?:ren)?$/i, '$1ren'],
+    [/eaux$/i, '$0'],
+    [/m[ae]n$/i, 'men'],
+    ['thou', 'you']
+  ].forEach(function (rule) {
+    return pluralize.addPluralRule(rule[0], rule[1]);
+  });
+
+  /**
+   * Singularization rules.
+   */
+  [
+    [/s$/i, ''],
+    [/(ss)$/i, '$1'],
+    [/(wi|kni|(?:after|half|high|low|mid|non|night|[^\w]|^)li)ves$/i, '$1fe'],
+    [/(ar|(?:wo|[ae])l|[eo][ao])ves$/i, '$1f'],
+    [/ies$/i, 'y'],
+    [/\b([pl]|zomb|(?:neck|cross)?t|coll|faer|food|gen|goon|group|lass|talk|goal|cut)ies$/i, '$1ie'],
+    [/\b(mon|smil)ies$/i, '$1ey'],
+    [/(m|l)ice$/i, '$1ouse'],
+    [/(seraph|cherub)im$/i, '$1'],
+    [/(x|ch|ss|sh|zz|tto|go|cho|alias|[^aou]us|tlas|gas|(?:her|at|gr)o|ris)(?:es)?$/i, '$1'],
+    [/(analy|ba|diagno|parenthe|progno|synop|the|empha|cri)(?:sis|ses)$/i, '$1sis'],
+    [/(movie|twelve|abuse|e[mn]u)s$/i, '$1'],
+    [/(test)(?:is|es)$/i, '$1is'],
+    [/(alumn|syllab|octop|vir|radi|nucle|fung|cact|stimul|termin|bacill|foc|uter|loc|strat)(?:us|i)$/i, '$1us'],
+    [/(agend|addend|millenni|dat|extrem|bacteri|desiderat|strat|candelabr|errat|ov|symposi|curricul|quor)a$/i, '$1um'],
+    [/(apheli|hyperbat|periheli|asyndet|noumen|phenomen|criteri|organ|prolegomen|hedr|automat)a$/i, '$1on'],
+    [/(alumn|alg|vertebr)ae$/i, '$1a'],
+    [/(cod|mur|sil|vert|ind)ices$/i, '$1ex'],
+    [/(matr|append)ices$/i, '$1ix'],
+    [/(pe)(rson|ople)$/i, '$1rson'],
+    [/(child)ren$/i, '$1'],
+    [/(eau)x?$/i, '$1'],
+    [/men$/i, 'man']
+  ].forEach(function (rule) {
+    return pluralize.addSingularRule(rule[0], rule[1]);
+  });
+
+  /**
+   * Uncountable rules.
+   */
+  [
+    // Singular words with no plurals.
+    'adulthood',
+    'advice',
+    'agenda',
+    'aid',
+    'alcohol',
+    'ammo',
+    'anime',
+    'athletics',
+    'audio',
+    'bison',
+    'blood',
+    'bream',
+    'buffalo',
+    'butter',
+    'carp',
+    'cash',
+    'chassis',
+    'chess',
+    'clothing',
+    'cod',
+    'commerce',
+    'cooperation',
+    'corps',
+    'debris',
+    'diabetes',
+    'digestion',
+    'elk',
+    'energy',
+    'equipment',
+    'excretion',
+    'expertise',
+    'flounder',
+    'fun',
+    'gallows',
+    'garbage',
+    'graffiti',
+    'headquarters',
+    'health',
+    'herpes',
+    'highjinks',
+    'homework',
+    'housework',
+    'information',
+    'jeans',
+    'justice',
+    'kudos',
+    'labour',
+    'literature',
+    'machinery',
+    'mackerel',
+    'mail',
+    'media',
+    'mews',
+    'moose',
+    'music',
+    'manga',
+    'news',
+    'pike',
+    'plankton',
+    'pliers',
+    'pollution',
+    'premises',
+    'rain',
+    'research',
+    'rice',
+    'salmon',
+    'scissors',
+    'series',
+    'sewage',
+    'shambles',
+    'shrimp',
+    'species',
+    'staff',
+    'swine',
+    'tennis',
+    'traffic',
+    'transporation',
+    'trout',
+    'tuna',
+    'wealth',
+    'welfare',
+    'whiting',
+    'wildebeest',
+    'wildlife',
+    'you',
+    // Regexes.
+    /[^aeiou]ese$/i, // "chinese", "japanese"
+    /deer$/i, // "deer", "reindeer"
+    /fish$/i, // "fish", "blowfish", "angelfish"
+    /measles$/i,
+    /o[iu]s$/i, // "carnivorous"
+    /pox$/i, // "chickpox", "smallpox"
+    /sheep$/i
+  ].forEach(pluralize.addUncountableRule);
+
+  return pluralize;
+});
+
+
+/***/ }),
+/* 19 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_jquery__ = __webpack_require__(21);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_jquery__ = __webpack_require__(22);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_jquery___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_0_jquery__);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1_g3n1us_helpers__ = __webpack_require__(22);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1_g3n1us_helpers__ = __webpack_require__(23);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_1_g3n1us_helpers___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_1_g3n1us_helpers__);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2_pouchdb__ = __webpack_require__(23);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2_pouchdb__ = __webpack_require__(24);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_3_pouchdb_find__ = __webpack_require__(15);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4_relational_pouch__ = __webpack_require__(34);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4_relational_pouch__ = __webpack_require__(35);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_4_relational_pouch___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_4_relational_pouch__);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_5_pluralize__ = __webpack_require__(40);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_5_pluralize___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_5_pluralize__);
-__webpack_require__(19).polyfill();
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_5__env__ = __webpack_require__(41);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_5__env___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_5__env__);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_6_pluralize__ = __webpack_require__(18);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_6_pluralize___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_6_pluralize__);
+__webpack_require__(20).polyfill();
 
 
 
+
+
+ // What would I use this for??
 
 
 __WEBPACK_IMPORTED_MODULE_2_pouchdb__["a" /* default */].plugin(__WEBPACK_IMPORTED_MODULE_3_pouchdb_find__["default"]);
@@ -4889,9 +5390,10 @@ class App extends Connection{
 	
 	
 	shouldRefresh(){
-		return true;
-		var refreshed_at = localStorage.g3n1us_db_refreshed_at
-			? new Date(localStorage.g3n1us_db_refreshed_at)
+// 		return true;
+		var refreshed_at_key = 'g3n1us_db_refreshed_at_' + this.handle;
+		var refreshed_at = localStorage[refreshed_at_key]
+			? new Date(localStorage[refreshed_at_key])
 			: new Date(null);
 		var stale_at = refreshed_at.setMonth(refreshed_at.getMonth() + 1); // one month
 		
@@ -4905,12 +5407,14 @@ class App extends Connection{
 	
 	// Data is older than set maxAge, so replenish the local DB from the API endpoint
 	getApi(){
+  	console.warn('Refreshing data from the api');
 		return new Promise((resolve, reject) => {
 			var all_docs = this.constructor.all();
+			let headers = this.headers || {};
 			var api_call = __WEBPACK_IMPORTED_MODULE_0_jquery___default.a.ajax({
 				url: this.connection.endpoint,
 				type: "GET",
-				headers: {}
+				headers: headers
 			});
 			
 			Promise.all([api_call, all_docs]).then((values) => {
@@ -4926,8 +5430,8 @@ class App extends Connection{
 						v.rev = rev_map[v.id];
 					return v;
 				});
-
-					localStorage.g3n1us_db_refreshed_at = new Date;
+      		var refreshed_at_key = 'g3n1us_db_refreshed_at_' + this.handle;
+					localStorage[refreshed_at_key] = new Date;
 					this.saveMany(alldata);
 				
 			});
@@ -4936,6 +5440,7 @@ class App extends Connection{
 	
 	// Data is within the set maxAge, so pull from local DB.
 	getDb(){
+  	console.warn('Data is FRESH!! Get from DB.');
 		return this.connection.db.allDocs({
 			include_docs: true,
 			attachments: true
@@ -4958,7 +5463,6 @@ class App extends Connection{
 		});		
 	}
 	
-	
 }
 /* harmony export (immutable) */ __webpack_exports__["App"] = App;
  // close Class
@@ -4969,11 +5473,14 @@ class App extends Connection{
 class Container{
 
   static add_model(model){
-    if(!model._initialized)
+    if(!model._initialized){
       model = new model;
+    }
     else{
       this.models = this.models || {};
-      this.models[model.handle] = model.schema;        
+      this.models[model.handle] = model.schema;  
+      this.model_instances = this.model_instances || {};
+      this.model_instances[model.handle] = model;    
     }
   }
   
@@ -4987,6 +5494,9 @@ class Container{
       return this;
     this.db.setSchema(this.full_schema);
     this._schema_set = true;
+    for(let i in this.model_instances)
+      this.model_instances[i].boot();
+    
     return this;
   }
 }
@@ -5090,6 +5600,7 @@ class Model extends QueryBuilder{
     this._initialized = true;
     this._defaults = {};
     this._data = data;
+    this.headers = {};
     Container.add_model(this);
     return new Proxy(this, this);
   }
@@ -5098,7 +5609,8 @@ class Model extends QueryBuilder{
   get schema(){
     let schema = {
       singular: this.handle,
-      plural: this.handle + 's', // obviously this is shitty
+      plural:  __WEBPACK_IMPORTED_MODULE_6_pluralize___default()(this.handle), // obviously this is shitty
+//       plural:  pluralizethis.handle + 's', // obviously this is shitty
     };
     if(Object.values(this.relations).length)
       schema.relations = this.relations;
@@ -5129,9 +5641,13 @@ class Model extends QueryBuilder{
             resolve(Container.db.rel.save(this.handle, merged));
           }
           else{
+            resolve(Container.db.rel.save(this.handle, save_data));
+/*
+            console.log(this);
             debugger;
-            console.log(this)
+            
             reject('The model to be saved could not be located');  
+*/
           }
             
         }).catch(reason => { 
@@ -5155,7 +5671,7 @@ class Model extends QueryBuilder{
       return this.save(v);
     });
     var promise = Promise.all(promises).then(values => {
-      console.log(values);
+      console.log(values); // needs an output return value of some kind. What should this be??
     }).catch(reason => { 
       console.log(reason)
     });
@@ -5224,7 +5740,7 @@ class Model extends QueryBuilder{
 
 
 /***/ }),
-/* 19 */
+/* 20 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(process, global) {var require;/*!
@@ -5364,7 +5880,7 @@ function flush() {
 function attemptVertx() {
   try {
     var r = require;
-    var vertx = __webpack_require__(20);
+    var vertx = __webpack_require__(21);
     vertxNext = vertx.runOnLoop || vertx.runOnContext;
     return useVertxTimer();
   } catch (e) {
@@ -6388,13 +6904,13 @@ return Promise$2;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(2), __webpack_require__(0)))
 
 /***/ }),
-/* 20 */
+/* 21 */
 /***/ (function(module, exports) {
 
 /* (ignored) */
 
 /***/ }),
-/* 21 */
+/* 22 */
 /***/ (function(module, exports, __webpack_require__) {
 
 var __WEBPACK_AMD_DEFINE_ARRAY__, __WEBPACK_AMD_DEFINE_RESULT__;/*!
@@ -16654,7 +17170,7 @@ return jQuery;
 
 
 /***/ }),
-/* 22 */
+/* 23 */
 /***/ (function(module, exports, __webpack_require__) {
 
 var g3n1us_helpers = {
@@ -17076,7 +17592,7 @@ if(true)
 	
 
 /***/ }),
-/* 23 */
+/* 24 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -17092,11 +17608,11 @@ if(true)
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_4_inherits___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_4_inherits__);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_5_immediate__ = __webpack_require__(5);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_5_immediate___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_5_immediate__);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_6_debug__ = __webpack_require__(26);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_6_debug__ = __webpack_require__(27);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_6_debug___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_6_debug__);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_7_spark_md5__ = __webpack_require__(14);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_7_spark_md5___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_7_spark_md5__);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_8_vuvuzela__ = __webpack_require__(29);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_8_vuvuzela__ = __webpack_require__(30);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_8_vuvuzela___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_8_vuvuzela__);
 
 
@@ -29285,7 +29801,7 @@ PouchDB$5.plugin(IDBPouch)
 /* WEBPACK VAR INJECTION */}.call(__webpack_exports__, __webpack_require__(0)))
 
 /***/ }),
-/* 24 */
+/* 25 */
 /***/ (function(module, exports, __webpack_require__) {
 
 var rng = __webpack_require__(10);
@@ -29391,7 +29907,7 @@ module.exports = v1;
 
 
 /***/ }),
-/* 25 */
+/* 26 */
 /***/ (function(module, exports, __webpack_require__) {
 
 var rng = __webpack_require__(10);
@@ -29426,7 +29942,7 @@ module.exports = v4;
 
 
 /***/ }),
-/* 26 */
+/* 27 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(process) {/**
@@ -29435,7 +29951,7 @@ module.exports = v4;
  * Expose `debug()` as the module.
  */
 
-exports = module.exports = __webpack_require__(27);
+exports = module.exports = __webpack_require__(28);
 exports.log = log;
 exports.formatArgs = formatArgs;
 exports.save = save;
@@ -29618,7 +30134,7 @@ function localstorage() {
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(2)))
 
 /***/ }),
-/* 27 */
+/* 28 */
 /***/ (function(module, exports, __webpack_require__) {
 
 
@@ -29634,7 +30150,7 @@ exports.coerce = coerce;
 exports.disable = disable;
 exports.enable = enable;
 exports.enabled = enabled;
-exports.humanize = __webpack_require__(28);
+exports.humanize = __webpack_require__(29);
 
 /**
  * The currently active debug mode names, and names to skip.
@@ -29826,7 +30342,7 @@ function coerce(val) {
 
 
 /***/ }),
-/* 28 */
+/* 29 */
 /***/ (function(module, exports) {
 
 /**
@@ -29981,7 +30497,7 @@ function plural(ms, n, name) {
 
 
 /***/ }),
-/* 29 */
+/* 30 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -30161,7 +30677,7 @@ exports.parse = function (str) {
 
 
 /***/ }),
-/* 30 */
+/* 31 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -30290,7 +30806,7 @@ function generateErrorFromResponse(err) {
 
 
 /***/ }),
-/* 31 */
+/* 32 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -30867,7 +31383,7 @@ function matchesSelector(doc, selector) {
 
 
 /***/ }),
-/* 32 */
+/* 33 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -30877,7 +31393,7 @@ function matchesSelector(doc, selector) {
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_3_pouchdb_binary_utils__ = __webpack_require__(16);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_4_pouchdb_collate__ = __webpack_require__(8);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_5_pouchdb_md5__ = __webpack_require__(17);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_6_pouchdb_mapreduce_utils__ = __webpack_require__(33);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_6_pouchdb_mapreduce_utils__ = __webpack_require__(34);
 
 
 
@@ -31908,7 +32424,7 @@ function createAbstractMapReduce(localDocName, mapper, reducer, ddocValidator) {
 
 
 /***/ }),
-/* 33 */
+/* 34 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -32042,18 +32558,18 @@ function mapToKeysArray(map) {
 
 
 /***/ }),
-/* 34 */
+/* 35 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
-var utils = __webpack_require__(35);
+var utils = __webpack_require__(36);
 var extend = utils.extend;
 var Promise = utils.Promise;
-var collections = __webpack_require__(37);
-var uuid = __webpack_require__(38);
-var uniq = __webpack_require__(39);
+var collections = __webpack_require__(38);
+var uuid = __webpack_require__(39);
+var uniq = __webpack_require__(40);
 
 function createError(str) {
   var err = new Error(str);
@@ -32559,7 +33075,7 @@ if (typeof window !== 'undefined' && window.PouchDB) {
 
 
 /***/ }),
-/* 35 */
+/* 36 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -32654,12 +33170,12 @@ exports.series = function (promiseFactories) {
 
 exports.inherits = __webpack_require__(1);
 exports.Promise = Promise;
-exports.extend = __webpack_require__(36);
+exports.extend = __webpack_require__(37);
 
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(2)))
 
 /***/ }),
-/* 36 */
+/* 37 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -32845,7 +33361,7 @@ module.exports = extend;
 
 
 /***/ }),
-/* 37 */
+/* 38 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -32925,7 +33441,7 @@ LazySet.prototype.delete = function (key) {
 };
 
 /***/ }),
-/* 38 */
+/* 39 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -33016,7 +33532,7 @@ module.exports = uuid;
 
 
 /***/ }),
-/* 39 */
+/* 40 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -33080,499 +33596,13 @@ module.exports = unique
 
 
 /***/ }),
-/* 40 */
-/***/ (function(module, exports, __webpack_require__) {
+/* 41 */
+/***/ (function(module, exports) {
 
-/* global define */
-
-(function (root, pluralize) {
-  /* istanbul ignore else */
-  if (true) {
-    // Node.
-    module.exports = pluralize();
-  } else if (typeof define === 'function' && define.amd) {
-    // AMD, registers as an anonymous module.
-    define(function () {
-      return pluralize();
-    });
-  } else {
-    // Browser global.
-    root.pluralize = pluralize();
-  }
-})(this, function () {
-  // Rule storage - pluralize and singularize need to be run sequentially,
-  // while other rules can be optimized using an object for instant lookups.
-  var pluralRules = [];
-  var singularRules = [];
-  var uncountables = {};
-  var irregularPlurals = {};
-  var irregularSingles = {};
-
-  /**
-   * Sanitize a pluralization rule to a usable regular expression.
-   *
-   * @param  {(RegExp|string)} rule
-   * @return {RegExp}
-   */
-  function sanitizeRule (rule) {
-    if (typeof rule === 'string') {
-      return new RegExp('^' + rule + '$', 'i');
-    }
-
-    return rule;
-  }
-
-  /**
-   * Pass in a word token to produce a function that can replicate the case on
-   * another word.
-   *
-   * @param  {string}   word
-   * @param  {string}   token
-   * @return {Function}
-   */
-  function restoreCase (word, token) {
-    // Tokens are an exact match.
-    if (word === token) return token;
-
-    // Upper cased words. E.g. "HELLO".
-    if (word === word.toUpperCase()) return token.toUpperCase();
-
-    // Title cased words. E.g. "Title".
-    if (word[0] === word[0].toUpperCase()) {
-      return token.charAt(0).toUpperCase() + token.substr(1).toLowerCase();
-    }
-
-    // Lower cased words. E.g. "test".
-    return token.toLowerCase();
-  }
-
-  /**
-   * Interpolate a regexp string.
-   *
-   * @param  {string} str
-   * @param  {Array}  args
-   * @return {string}
-   */
-  function interpolate (str, args) {
-    return str.replace(/\$(\d{1,2})/g, function (match, index) {
-      return args[index] || '';
-    });
-  }
-
-  /**
-   * Replace a word using a rule.
-   *
-   * @param  {string} word
-   * @param  {Array}  rule
-   * @return {string}
-   */
-  function replace (word, rule) {
-    return word.replace(rule[0], function (match, index) {
-      var result = interpolate(rule[1], arguments);
-
-      if (match === '') {
-        return restoreCase(word[index - 1], result);
-      }
-
-      return restoreCase(match, result);
-    });
-  }
-
-  /**
-   * Sanitize a word by passing in the word and sanitization rules.
-   *
-   * @param  {string}   token
-   * @param  {string}   word
-   * @param  {Array}    rules
-   * @return {string}
-   */
-  function sanitizeWord (token, word, rules) {
-    // Empty string or doesn't need fixing.
-    if (!token.length || uncountables.hasOwnProperty(token)) {
-      return word;
-    }
-
-    var len = rules.length;
-
-    // Iterate over the sanitization rules and use the first one to match.
-    while (len--) {
-      var rule = rules[len];
-
-      if (rule[0].test(word)) return replace(word, rule);
-    }
-
-    return word;
-  }
-
-  /**
-   * Replace a word with the updated word.
-   *
-   * @param  {Object}   replaceMap
-   * @param  {Object}   keepMap
-   * @param  {Array}    rules
-   * @return {Function}
-   */
-  function replaceWord (replaceMap, keepMap, rules) {
-    return function (word) {
-      // Get the correct token and case restoration functions.
-      var token = word.toLowerCase();
-
-      // Check against the keep object map.
-      if (keepMap.hasOwnProperty(token)) {
-        return restoreCase(word, token);
-      }
-
-      // Check against the replacement map for a direct word replacement.
-      if (replaceMap.hasOwnProperty(token)) {
-        return restoreCase(word, replaceMap[token]);
-      }
-
-      // Run all the rules against the word.
-      return sanitizeWord(token, word, rules);
-    };
-  }
-
-  /**
-   * Check if a word is part of the map.
-   */
-  function checkWord (replaceMap, keepMap, rules, bool) {
-    return function (word) {
-      var token = word.toLowerCase();
-
-      if (keepMap.hasOwnProperty(token)) return true;
-      if (replaceMap.hasOwnProperty(token)) return false;
-
-      return sanitizeWord(token, token, rules) === token;
-    };
-  }
-
-  /**
-   * Pluralize or singularize a word based on the passed in count.
-   *
-   * @param  {string}  word
-   * @param  {number}  count
-   * @param  {boolean} inclusive
-   * @return {string}
-   */
-  function pluralize (word, count, inclusive) {
-    var pluralized = count === 1
-      ? pluralize.singular(word) : pluralize.plural(word);
-
-    return (inclusive ? count + ' ' : '') + pluralized;
-  }
-
-  /**
-   * Pluralize a word.
-   *
-   * @type {Function}
-   */
-  pluralize.plural = replaceWord(
-    irregularSingles, irregularPlurals, pluralRules
-  );
-
-  /**
-   * Check if a word is plural.
-   *
-   * @type {Function}
-   */
-  pluralize.isPlural = checkWord(
-    irregularSingles, irregularPlurals, pluralRules
-  );
-
-  /**
-   * Singularize a word.
-   *
-   * @type {Function}
-   */
-  pluralize.singular = replaceWord(
-    irregularPlurals, irregularSingles, singularRules
-  );
-
-  /**
-   * Check if a word is singular.
-   *
-   * @type {Function}
-   */
-  pluralize.isSingular = checkWord(
-    irregularPlurals, irregularSingles, singularRules
-  );
-
-  /**
-   * Add a pluralization rule to the collection.
-   *
-   * @param {(string|RegExp)} rule
-   * @param {string}          replacement
-   */
-  pluralize.addPluralRule = function (rule, replacement) {
-    pluralRules.push([sanitizeRule(rule), replacement]);
-  };
-
-  /**
-   * Add a singularization rule to the collection.
-   *
-   * @param {(string|RegExp)} rule
-   * @param {string}          replacement
-   */
-  pluralize.addSingularRule = function (rule, replacement) {
-    singularRules.push([sanitizeRule(rule), replacement]);
-  };
-
-  /**
-   * Add an uncountable word rule.
-   *
-   * @param {(string|RegExp)} word
-   */
-  pluralize.addUncountableRule = function (word) {
-    if (typeof word === 'string') {
-      uncountables[word.toLowerCase()] = true;
-      return;
-    }
-
-    // Set singular and plural references for the word.
-    pluralize.addPluralRule(word, '$0');
-    pluralize.addSingularRule(word, '$0');
-  };
-
-  /**
-   * Add an irregular word definition.
-   *
-   * @param {string} single
-   * @param {string} plural
-   */
-  pluralize.addIrregularRule = function (single, plural) {
-    plural = plural.toLowerCase();
-    single = single.toLowerCase();
-
-    irregularSingles[single] = plural;
-    irregularPlurals[plural] = single;
-  };
-
-  /**
-   * Irregular rules.
-   */
-  [
-    // Pronouns.
-    ['I', 'we'],
-    ['me', 'us'],
-    ['he', 'they'],
-    ['she', 'they'],
-    ['them', 'them'],
-    ['myself', 'ourselves'],
-    ['yourself', 'yourselves'],
-    ['itself', 'themselves'],
-    ['herself', 'themselves'],
-    ['himself', 'themselves'],
-    ['themself', 'themselves'],
-    ['is', 'are'],
-    ['was', 'were'],
-    ['has', 'have'],
-    ['this', 'these'],
-    ['that', 'those'],
-    // Words ending in with a consonant and `o`.
-    ['echo', 'echoes'],
-    ['dingo', 'dingoes'],
-    ['volcano', 'volcanoes'],
-    ['tornado', 'tornadoes'],
-    ['torpedo', 'torpedoes'],
-    // Ends with `us`.
-    ['genus', 'genera'],
-    ['viscus', 'viscera'],
-    // Ends with `ma`.
-    ['stigma', 'stigmata'],
-    ['stoma', 'stomata'],
-    ['dogma', 'dogmata'],
-    ['lemma', 'lemmata'],
-    ['schema', 'schemata'],
-    ['anathema', 'anathemata'],
-    // Other irregular rules.
-    ['ox', 'oxen'],
-    ['axe', 'axes'],
-    ['die', 'dice'],
-    ['yes', 'yeses'],
-    ['foot', 'feet'],
-    ['eave', 'eaves'],
-    ['goose', 'geese'],
-    ['tooth', 'teeth'],
-    ['quiz', 'quizzes'],
-    ['human', 'humans'],
-    ['proof', 'proofs'],
-    ['carve', 'carves'],
-    ['valve', 'valves'],
-    ['looey', 'looies'],
-    ['thief', 'thieves'],
-    ['groove', 'grooves'],
-    ['pickaxe', 'pickaxes'],
-    ['whiskey', 'whiskies']
-  ].forEach(function (rule) {
-    return pluralize.addIrregularRule(rule[0], rule[1]);
-  });
-
-  /**
-   * Pluralization rules.
-   */
-  [
-    [/s?$/i, 's'],
-    [/[^\u0000-\u007F]$/i, '$0'],
-    [/([^aeiou]ese)$/i, '$1'],
-    [/(ax|test)is$/i, '$1es'],
-    [/(alias|[^aou]us|tlas|gas|ris)$/i, '$1es'],
-    [/(e[mn]u)s?$/i, '$1s'],
-    [/([^l]ias|[aeiou]las|[emjzr]as|[iu]am)$/i, '$1'],
-    [/(alumn|syllab|octop|vir|radi|nucle|fung|cact|stimul|termin|bacill|foc|uter|loc|strat)(?:us|i)$/i, '$1i'],
-    [/(alumn|alg|vertebr)(?:a|ae)$/i, '$1ae'],
-    [/(seraph|cherub)(?:im)?$/i, '$1im'],
-    [/(her|at|gr)o$/i, '$1oes'],
-    [/(agend|addend|millenni|dat|extrem|bacteri|desiderat|strat|candelabr|errat|ov|symposi|curricul|automat|quor)(?:a|um)$/i, '$1a'],
-    [/(apheli|hyperbat|periheli|asyndet|noumen|phenomen|criteri|organ|prolegomen|hedr|automat)(?:a|on)$/i, '$1a'],
-    [/sis$/i, 'ses'],
-    [/(?:(kni|wi|li)fe|(ar|l|ea|eo|oa|hoo)f)$/i, '$1$2ves'],
-    [/([^aeiouy]|qu)y$/i, '$1ies'],
-    [/([^ch][ieo][ln])ey$/i, '$1ies'],
-    [/(x|ch|ss|sh|zz)$/i, '$1es'],
-    [/(matr|cod|mur|sil|vert|ind|append)(?:ix|ex)$/i, '$1ices'],
-    [/(m|l)(?:ice|ouse)$/i, '$1ice'],
-    [/(pe)(?:rson|ople)$/i, '$1ople'],
-    [/(child)(?:ren)?$/i, '$1ren'],
-    [/eaux$/i, '$0'],
-    [/m[ae]n$/i, 'men'],
-    ['thou', 'you']
-  ].forEach(function (rule) {
-    return pluralize.addPluralRule(rule[0], rule[1]);
-  });
-
-  /**
-   * Singularization rules.
-   */
-  [
-    [/s$/i, ''],
-    [/(ss)$/i, '$1'],
-    [/(wi|kni|(?:after|half|high|low|mid|non|night|[^\w]|^)li)ves$/i, '$1fe'],
-    [/(ar|(?:wo|[ae])l|[eo][ao])ves$/i, '$1f'],
-    [/ies$/i, 'y'],
-    [/\b([pl]|zomb|(?:neck|cross)?t|coll|faer|food|gen|goon|group|lass|talk|goal|cut)ies$/i, '$1ie'],
-    [/\b(mon|smil)ies$/i, '$1ey'],
-    [/(m|l)ice$/i, '$1ouse'],
-    [/(seraph|cherub)im$/i, '$1'],
-    [/(x|ch|ss|sh|zz|tto|go|cho|alias|[^aou]us|tlas|gas|(?:her|at|gr)o|ris)(?:es)?$/i, '$1'],
-    [/(analy|ba|diagno|parenthe|progno|synop|the|empha|cri)(?:sis|ses)$/i, '$1sis'],
-    [/(movie|twelve|abuse|e[mn]u)s$/i, '$1'],
-    [/(test)(?:is|es)$/i, '$1is'],
-    [/(alumn|syllab|octop|vir|radi|nucle|fung|cact|stimul|termin|bacill|foc|uter|loc|strat)(?:us|i)$/i, '$1us'],
-    [/(agend|addend|millenni|dat|extrem|bacteri|desiderat|strat|candelabr|errat|ov|symposi|curricul|quor)a$/i, '$1um'],
-    [/(apheli|hyperbat|periheli|asyndet|noumen|phenomen|criteri|organ|prolegomen|hedr|automat)a$/i, '$1on'],
-    [/(alumn|alg|vertebr)ae$/i, '$1a'],
-    [/(cod|mur|sil|vert|ind)ices$/i, '$1ex'],
-    [/(matr|append)ices$/i, '$1ix'],
-    [/(pe)(rson|ople)$/i, '$1rson'],
-    [/(child)ren$/i, '$1'],
-    [/(eau)x?$/i, '$1'],
-    [/men$/i, 'man']
-  ].forEach(function (rule) {
-    return pluralize.addSingularRule(rule[0], rule[1]);
-  });
-
-  /**
-   * Uncountable rules.
-   */
-  [
-    // Singular words with no plurals.
-    'adulthood',
-    'advice',
-    'agenda',
-    'aid',
-    'alcohol',
-    'ammo',
-    'anime',
-    'athletics',
-    'audio',
-    'bison',
-    'blood',
-    'bream',
-    'buffalo',
-    'butter',
-    'carp',
-    'cash',
-    'chassis',
-    'chess',
-    'clothing',
-    'cod',
-    'commerce',
-    'cooperation',
-    'corps',
-    'debris',
-    'diabetes',
-    'digestion',
-    'elk',
-    'energy',
-    'equipment',
-    'excretion',
-    'expertise',
-    'flounder',
-    'fun',
-    'gallows',
-    'garbage',
-    'graffiti',
-    'headquarters',
-    'health',
-    'herpes',
-    'highjinks',
-    'homework',
-    'housework',
-    'information',
-    'jeans',
-    'justice',
-    'kudos',
-    'labour',
-    'literature',
-    'machinery',
-    'mackerel',
-    'mail',
-    'media',
-    'mews',
-    'moose',
-    'music',
-    'manga',
-    'news',
-    'pike',
-    'plankton',
-    'pliers',
-    'pollution',
-    'premises',
-    'rain',
-    'research',
-    'rice',
-    'salmon',
-    'scissors',
-    'series',
-    'sewage',
-    'shambles',
-    'shrimp',
-    'species',
-    'staff',
-    'swine',
-    'tennis',
-    'traffic',
-    'transporation',
-    'trout',
-    'tuna',
-    'wealth',
-    'welfare',
-    'whiting',
-    'wildebeest',
-    'wildlife',
-    'you',
-    // Regexes.
-    /[^aeiou]ese$/i, // "chinese", "japanese"
-    /deer$/i, // "deer", "reindeer"
-    /fish$/i, // "fish", "blowfish", "angelfish"
-    /measles$/i,
-    /o[iu]s$/i, // "carnivorous"
-    /pox$/i, // "chickpox", "smallpox"
-    /sheep$/i
-  ].forEach(pluralize.addUncountableRule);
-
-  return pluralize;
-});
+module.exports = {
+  api_key: 'xxx',
+  
+}
 
 
 /***/ })
