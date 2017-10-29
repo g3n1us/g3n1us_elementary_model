@@ -8,4 +8,11 @@ module.exports = {
     libraryTarget: "var",
 	library: "g3n1us"
   },
+  module: {
+    loaders: [{
+      test: /\.js$/,
+      exclude: /node_modules/,
+      loader: 'babel-loader'
+    }]
+  }
 };

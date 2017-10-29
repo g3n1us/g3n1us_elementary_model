@@ -1,5 +1,20 @@
 # G3N1US ActivePouch
 
+## Get Started
+
+```javascript
+class Animal extends g3n1us.Model{
+  constructor(){
+    super(arguments[0]);
+    this.connection.endpoint = '//example.com/api/files.json';
+  }
+}
+```
+
+## About
+ActivePouch lets you keep your application's logic separate from your API's schema. API's go away, change, sometimes don't work. Keep your app untethered from your API. 
+
+
 `````javascript
 class Animal extends g3n1us.Model{
   constructor(){

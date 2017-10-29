@@ -1,4 +1,5 @@
 require('es6-promise').polyfill();
+import 'babel-polyfill';
 import $ from 'jquery';
 import helpers from 'g3n1us_helpers';
 import PouchDB from 'pouchdb';
@@ -9,9 +10,6 @@ import pluralize from 'pluralize';
 
 PouchDB.plugin(PouchDBFind);
 PouchDB.plugin(RelationalPouch);
-
-import pluralize from 'pluralize';
-// import axios from 'axios';
 
 
 export class Connection{
@@ -167,12 +165,7 @@ class QueryBuilder extends App{
 */
   }
   
-  /**
-  	private base functionality for other query functions
-  */
-	_base_query(value = null, key = 'id', operator = '='){
-		return new Promise((resolve, reject) => {
-			let query_object = {};
+  static get operator_map(){
 			let operator_map = {};
 			operator_map['='] = '$eq';
 			operator_map['>'] = '$gt';
@@ -187,6 +180,47 @@ class QueryBuilder extends App{
 			operator_map['out'] = '$nin';
 			operator_map['size'] = '$size';
 			operator_map['regex'] = '$regex';
+			return operator_map;
+  }
+  
+  static parseQueryArgs(args){
+  	let arg_array = [...args];
+  	var query_obj = {
+    	key: 'id',
+    	operator: '=',
+    	value: null,
+    	callback: null,
+  	}
+  	var last_arg = arg_array.splice(-1)[0];  	
+  	if(typeof last_arg === 'function')
+    	query_obj.callback = last_arg;
+  		
+  	if(arg_array.length === 1){
+    	query_obj.value = args[0];
+    	return query_obj;
+  	}
+  	else if(arg_array.length === 2){
+    	query_obj.key = arg_array[0];
+    	query_obj.value = arg_array[1];
+      return query_obj;    	
+  	}
+  	else if(arg_array.length === 3){
+    	query_obj.key = arg_array[0];
+    	query_obj.operator = arg_array[1];
+    	query_obj.value = arg_array[2];
+    	return query_obj;
+  	}
+  	else
+    	throw new Error('Number of query arguments is out of range');
+  }
+  
+  /**
+  	private base functionality for other query functions
+  */
+	_base_query(value = null, key = 'id', operator = '='){
+		return new Promise((resolve, reject) => {
+			let query_object = {};
+			let operator_map = QueryBuilder.operator_map;
 			if(operator == 'contains'){
   			value = new RegExp('(.*?)'+value+'(.*?)');
 			}
@@ -226,7 +260,24 @@ class QueryBuilder extends App{
 		});
 	}
 	
-	_where(key = 'id', value = null,  operator = '=', callback){
+	_where(key = 'id', valueOrOperator = null,  operatorOrValue = '=', callback = null){
+  	let arg_array = [];
+  	for(let i in arguments){
+    	arg_array.push(arguments[i]);
+  	}
+  	var last_arg = arg_array.splice(-1);  	
+  	if(typeof last_arg === 'function')
+    	callback = arg_array.splice(-1)[0];
+    	
+  	if(arg_array.length === 2){
+    	var value = arg_array[1];
+    	var operator = '=';
+  	}
+  	else{
+    	var value = arg_array[2];
+    	var operator = arg_array[1];
+  	}
+  	console.log(value, key, operator, callback);  
 		return new Promise((resolve, reject) => {
 			this._base_query(value, key, operator).then((data) => {
 				resolve(Container.boot().db.rel.parseRelDocs(this.type, data));
@@ -255,14 +306,13 @@ export class Model extends QueryBuilder{
   get schema(){
     let schema = {
       singular: this.handle,
-      plural:  pluralize(this.handle), // obviously this is shitty
+      plural:  pluralize(this.handle),
 //       plural:  pluralizethis.handle + 's', // obviously this is shitty
     };
     if(Object.values(this.relations).length)
       schema.relations = this.relations;
     return schema;
   }
-  
   
   get data(){
     return helpers.array_merge(this._defaults, this._data);
@@ -337,10 +387,12 @@ export class Model extends QueryBuilder{
   }
   
   static where(key = 'id', value = null, operator = '=', callback){
+    var args = QueryBuilder.parseQueryArgs(arguments);
+    // builder is a singleton in order to add subsequent elements to query.
     this.builder = this.builder || new QueryBuilder(this.getProperty('handle'));
-    var promise = this.builder._where(key, value, operator);
-		if(typeof callback === 'function')
-  		promise.then(callback);
+    var promise = this.builder._where(args.key, args.value, args.operator);
+		if(args.callback)
+  		promise.then(args.callback);
 		return promise;
   }
   
