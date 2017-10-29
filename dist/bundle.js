@@ -8695,37 +8695,32 @@ var QueryBuilder = function (_App) {
     /**
     	private base functionality for other query functions
     */
-    value: function _base_query() {
-      var value = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : null;
-      var key = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 'id';
-      var operator = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : '=';
+    value: function _base_query(query_object) {
+      var _this4 = this;
 
       return new Promise(function (resolve, reject) {
-        var query_object = {};
         var operator_map = QueryBuilder.operator_map;
-        if (operator == 'contains') {
-          value = new RegExp('(.*?)' + value + '(.*?)');
-        }
-        if (operator == 'ends_with') {
-          value = new RegExp('(.*?)' + value + '$');
-        }
-        if (operator == 'starts_with') {
-          value = new RegExp('^' + value + '(.*?)');
-        }
-        var operator_string = value instanceof RegExp ? '$regex' : operator_map[operator];
-        query_object[operator_string] = value;
+        var operator_string = query_object.value instanceof RegExp ? '$regex' : operator_map[query_object.operator];
+        console.log(operator_string);
+        var pouch_query_object = {};
+        pouch_query_object[operator_string] = query_object.value;
         var index_statement = {
           index: {
-            fields: ['data.' + key]
+            fields: ['data.' + query_object.key]
           },
           type: "json"
         };
 
         Container.boot().db.createIndex(index_statement).then(function () {
           var query = { selector: {} };
-          query.selector['data.' + key] = query_object;
+          query.selector['data.' + query_object.key] = pouch_query_object;
           Container.boot().db.find(query).then(function (results) {
-            resolve(results.docs);
+            var promise = Container.boot().db.rel.parseRelDocs(_this4.type, results.docs);
+
+            if (query_object.callback) promise.then(query_object.callback);
+            return promise;
+
+            resolve(promise);
           });
         });
       });
@@ -8733,38 +8728,6 @@ var QueryBuilder = function (_App) {
 
     // This gets called by Model directly. TODO need to change this!
 
-  }, {
-    key: '_where',
-    value: function _where() {
-      var key = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : 'id';
-      var valueOrOperator = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : null;
-
-      var _this4 = this;
-
-      var operatorOrValue = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : '=';
-      var callback = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : null;
-
-      var arg_array = [];
-      for (var i in arguments) {
-        arg_array.push(arguments[i]);
-      }
-      var last_arg = arg_array.splice(-1);
-      if (typeof last_arg === 'function') callback = arg_array.splice(-1)[0];
-
-      if (arg_array.length === 2) {
-        var value = arg_array[1];
-        var operator = '=';
-      } else {
-        var value = arg_array[2];
-        var operator = arg_array[1];
-      }
-      console.log(value, key, operator, callback);
-      return new Promise(function (resolve, reject) {
-        _this4._base_query(value, key, operator).then(function (data) {
-          resolve(Container.boot().db.rel.parseRelDocs(_this4.type, data));
-        });
-      });
-    }
   }], [{
     key: 'parseQueryArgs',
     value: function parseQueryArgs(args) {
@@ -8775,22 +8738,31 @@ var QueryBuilder = function (_App) {
         value: null,
         callback: null
       };
-      var last_arg = arg_array.splice(-1)[0];
-      if (typeof last_arg === 'function') query_obj.callback = last_arg;
+      var last_arg = arg_array[arg_array.length - 1];
+      if (typeof last_arg === 'function') query_obj.callback = arg_array.splice(-1)[0];
 
       if (arg_array.length === 1) {
         query_obj.value = args[0];
-        return query_obj;
       } else if (arg_array.length === 2) {
         query_obj.key = arg_array[0];
         query_obj.value = arg_array[1];
-        return query_obj;
       } else if (arg_array.length === 3) {
         query_obj.key = arg_array[0];
         query_obj.operator = arg_array[1];
         query_obj.value = arg_array[2];
-        return query_obj;
       } else throw new Error('Number of query arguments is out of range');
+
+      if (query_obj.operator == 'contains') {
+        query_obj.value = new RegExp('(.*?)' + query_obj.value + '(.*?)');
+      }
+      if (query_obj.operator == 'ends_with') {
+        query_obj.value = new RegExp('(.*?)' + query_obj.value + '$');
+      }
+      if (query_obj.operator == 'starts_with') {
+        query_obj.value = new RegExp('^' + query_obj.value + '(.*?)');
+      }
+
+      return query_obj;
     }
   }, {
     key: 'find',
@@ -8805,6 +8777,52 @@ var QueryBuilder = function (_App) {
           resolve(data[_this5.getProperty('schema').plural][0]);
         });
       });
+    }
+
+    /*
+    	_where(key = 'id', valueOrOperator = null,  operatorOrValue = '=', callback = null){
+      	let arg_array = [];
+      	for(let i in arguments){
+        	arg_array.push(arguments[i]);
+      	}
+      	var last_arg = arg_array.splice(-1);  	
+      	if(typeof last_arg === 'function')
+        	callback = arg_array.splice(-1)[0];
+        	
+      	if(arg_array.length === 2){
+        	var value = arg_array[1];
+        	var operator = '=';
+      	}
+      	else{
+        	var value = arg_array[2];
+        	var operator = arg_array[1];
+      	}
+      	console.log(value, key, operator, callback);  
+    		return new Promise((resolve, reject) => {
+    			this._base_query(value, key, operator).then((data) => {
+    				resolve(Container.boot().db.rel.parseRelDocs(this.type, data));
+    			});
+    		});  	
+    	}
+    */
+
+  }, {
+    key: 'where',
+    value: function where() {
+      var key = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : 'id';
+      var value = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : null;
+      var operator = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : '=';
+      var callback = arguments[3];
+
+      var query_object = QueryBuilder.parseQueryArgs(arguments);
+      // builder is a singleton in order to add subsequent elements to query.
+      this.builder = this.builder || new QueryBuilder(this.getProperty('handle'));
+      return this.builder._base_query(query_object);
+      /*
+      		if(query_object.callback)
+        		promise.then(query_object.callback);
+      		return promise;
+      */
     }
   }, {
     key: 'operator_map',
@@ -8982,21 +9000,6 @@ var Model = exports.Model = function (_QueryBuilder) {
       if (typeof callback === "function") {
         promise.then(callback);
       }
-      return promise;
-    }
-  }, {
-    key: 'where',
-    value: function where() {
-      var key = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : 'id';
-      var value = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : null;
-      var operator = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : '=';
-      var callback = arguments[3];
-
-      var args = QueryBuilder.parseQueryArgs(arguments);
-      // builder is a singleton in order to add subsequent elements to query.
-      this.builder = this.builder || new QueryBuilder(this.getProperty('handle'));
-      var promise = this.builder._where(args.key, args.value, args.operator);
-      if (args.callback) promise.then(args.callback);
       return promise;
     }
   }]);
