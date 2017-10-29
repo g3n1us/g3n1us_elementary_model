@@ -47,7 +47,6 @@ Animal.where('legs', '>=', 4).then((response) => {
 });
 ```
 ### Other operators
-|             |                             |
 | ----------- | --------------------------- |
 | `'='`       | equals                      |
 | `'>'`       | greater than                |
@@ -68,6 +67,7 @@ _____
 
 > Don't like Promises?!
 All query methods can also accept a callback as the last argument
+
 ```javascript
 Animal.find('187', function(animal){
   console.log('I found the animal! ' + animal);
