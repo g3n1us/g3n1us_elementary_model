@@ -8540,9 +8540,13 @@ var App = exports.App = function (_Connection) {
       // 		return true;
       var refreshed_at_key = 'g3n1us_db_refreshed_at_' + this.handle;
       var refreshed_at = localStorage[refreshed_at_key] ? new Date(localStorage[refreshed_at_key]) : new Date(null);
-      var stale_at = refreshed_at.setMonth(refreshed_at.getMonth() + 1); // one month
+      console.log(this.connection.maxAge);
+      var stale_at = refreshed_at.getTime() + this.connection.maxAge * 1000;
+      var now = new Date().getTime();
+      console.log(stale_at);
+      console.log(now);
 
-      return new Date().getTime() > stale_at;
+      return now > stale_at;
     }
   }, {
     key: 'filterResponse',
@@ -8772,40 +8776,16 @@ var QueryBuilder = function (_App) {
       var keyname = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 'id';
 
       if (!primary_key) throw new Error('You must pass an id to this function.');
+      var last_arg = arguments[arguments.length - 1];
+      if (typeof last_arg === 'function') var callback = last_arg;
+
       return new Promise(function (resolve, reject) {
         Container.boot().db.rel.find(_this5.getProperty('handle'), primary_key).then(function (data) {
+          if (typeof callback === 'function') callback(data[_this5.getProperty('schema').plural][0]);
           resolve(data[_this5.getProperty('schema').plural][0]);
         });
       });
     }
-
-    /*
-    	_where(key = 'id', valueOrOperator = null,  operatorOrValue = '=', callback = null){
-      	let arg_array = [];
-      	for(let i in arguments){
-        	arg_array.push(arguments[i]);
-      	}
-      	var last_arg = arg_array.splice(-1);  	
-      	if(typeof last_arg === 'function')
-        	callback = arg_array.splice(-1)[0];
-        	
-      	if(arg_array.length === 2){
-        	var value = arg_array[1];
-        	var operator = '=';
-      	}
-      	else{
-        	var value = arg_array[2];
-        	var operator = arg_array[1];
-      	}
-      	console.log(value, key, operator, callback);  
-    		return new Promise((resolve, reject) => {
-    			this._base_query(value, key, operator).then((data) => {
-    				resolve(Container.boot().db.rel.parseRelDocs(this.type, data));
-    			});
-    		});  	
-    	}
-    */
-
   }, {
     key: 'where',
     value: function where() {
@@ -8818,11 +8798,6 @@ var QueryBuilder = function (_App) {
       // builder is a singleton in order to add subsequent elements to query.
       this.builder = this.builder || new QueryBuilder(this.getProperty('handle'));
       return this.builder._base_query(query_object);
-      /*
-      		if(query_object.callback)
-        		promise.then(query_object.callback);
-      		return promise;
-      */
     }
   }, {
     key: 'operator_map',

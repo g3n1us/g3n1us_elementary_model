@@ -43,9 +43,13 @@ export class App extends Connection{
 		var refreshed_at = localStorage[refreshed_at_key]
 			? new Date(localStorage[refreshed_at_key])
 			: new Date(null);
-		var stale_at = refreshed_at.setMonth(refreshed_at.getMonth() + 1); // one month
+			console.log(this.connection.maxAge);
+		var stale_at = refreshed_at.getTime() + (this.connection.maxAge * 1000);
+		var now = new Date().getTime();
+		console.log(stale_at);
+		console.log(now);
 		
-		return new Date().getTime() > stale_at;
+		return now > stale_at;
 	}
 	
 	filterResponse(response){
@@ -260,50 +264,25 @@ class QueryBuilder extends App{
 	// This gets called by Model directly. TODO need to change this!
 	static find(primary_key, keyname = 'id'){
 		if(!primary_key) throw new Error('You must pass an id to this function.');
+  	var last_arg = arguments[arguments.length - 1];
+  	if(typeof last_arg === 'function')
+    	var callback = last_arg;
+
 		return new Promise((resolve, reject) => {
       Container.boot().db.rel.find(this.getProperty('handle'), primary_key).then((data) => { 
+        if(typeof callback === 'function')
+          callback(data[this.getProperty('schema').plural][0]);
         resolve(data[this.getProperty('schema').plural][0]); 
       });
 		});
 	}
 	
-/*
-	_where(key = 'id', valueOrOperator = null,  operatorOrValue = '=', callback = null){
-  	let arg_array = [];
-  	for(let i in arguments){
-    	arg_array.push(arguments[i]);
-  	}
-  	var last_arg = arg_array.splice(-1);  	
-  	if(typeof last_arg === 'function')
-    	callback = arg_array.splice(-1)[0];
-    	
-  	if(arg_array.length === 2){
-    	var value = arg_array[1];
-    	var operator = '=';
-  	}
-  	else{
-    	var value = arg_array[2];
-    	var operator = arg_array[1];
-  	}
-  	console.log(value, key, operator, callback);  
-		return new Promise((resolve, reject) => {
-			this._base_query(value, key, operator).then((data) => {
-				resolve(Container.boot().db.rel.parseRelDocs(this.type, data));
-			});
-		});  	
-	}
-*/
 	
   static where(key = 'id', value = null, operator = '=', callback){
     var query_object = QueryBuilder.parseQueryArgs(arguments);
     // builder is a singleton in order to add subsequent elements to query.
     this.builder = this.builder || new QueryBuilder(this.getProperty('handle'));
     return this.builder._base_query(query_object);
-/*
-		if(query_object.callback)
-  		promise.then(query_object.callback);
-		return promise;
-*/
   }
 	
 }
