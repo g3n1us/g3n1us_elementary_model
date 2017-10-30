@@ -8448,7 +8448,7 @@ function stringMd5(string) {
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.Model = exports.Container = exports.App = exports.Connection = undefined;
+exports.Model = exports.Relation = exports.Container = exports.App = exports.Connection = undefined;
 
 var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
 
@@ -8722,7 +8722,6 @@ var QueryBuilder = function (_App) {
             var promise = Container.boot().db.rel.parseRelDocs(_this4.type, results.docs);
 
             if (query_object.callback) promise.then(query_object.callback);
-            return promise;
 
             resolve(promise);
           });
@@ -8781,8 +8780,10 @@ var QueryBuilder = function (_App) {
 
       return new Promise(function (resolve, reject) {
         Container.boot().db.rel.find(_this5.getProperty('handle'), primary_key).then(function (data) {
-          if (typeof callback === 'function') callback(data[_this5.getProperty('schema').plural][0]);
-          resolve(data[_this5.getProperty('schema').plural][0]);
+          var pluralname = _this5.getProperty('schema').plural;
+          var modelized = new _this5(data[pluralname][0]);
+          if (typeof callback === 'function') callback(modelized);
+          resolve(modelized);
         });
       });
     }
@@ -8791,13 +8792,24 @@ var QueryBuilder = function (_App) {
     value: function where() {
       var key = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : 'id';
       var value = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : null;
+
+      var _this6 = this;
+
       var operator = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : '=';
       var callback = arguments[3];
 
       var query_object = QueryBuilder.parseQueryArgs(arguments);
       // builder is a singleton in order to add subsequent elements to query.
       this.builder = this.builder || new QueryBuilder(this.getProperty('handle'));
-      return this.builder._base_query(query_object);
+      this.builder._base_query(query_object).then(function (results) {
+        var pluralname = _this6.getProperty('schema').plural;
+        var mapped = results[pluralname].map(function ($m) {
+          return new _this6($m);
+        });
+
+        return Promise.resolve(mapped);
+      });
+      //     return this.builder._base_query(query_object);
     }
   }, {
     key: 'operator_map',
@@ -8823,8 +8835,41 @@ var QueryBuilder = function (_App) {
   return QueryBuilder;
 }(App);
 
-var Model = exports.Model = function (_QueryBuilder) {
-  _inherits(Model, _QueryBuilder);
+var Relation = exports.Relation = function (_QueryBuilder) {
+  _inherits(Relation, _QueryBuilder);
+
+  function Relation() {
+    var data = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+
+    _classCallCheck(this, Relation);
+
+    var _this7 = _possibleConstructorReturn(this, (Relation.__proto__ || Object.getPrototypeOf(Relation)).call(this));
+
+    _this7.model = null;
+    _this7.relation_model = null;
+    return _this7;
+  }
+
+  _createClass(Relation, [{
+    key: 'hasOne',
+    value: function hasOne(model) {
+      console.log(this.handle, model.getProperty('handle'));
+      var foreign_handle = model.getProperty('handle');
+      this.relations[foreign_handle] = { belongsTo: foreign_handle };
+    }
+  }, {
+    key: 'hasMany',
+    value: function hasMany() {}
+  }, {
+    key: 'belongsTo',
+    value: function belongsTo() {}
+  }]);
+
+  return Relation;
+}(QueryBuilder);
+
+var Model = exports.Model = function (_Relation) {
+  _inherits(Model, _Relation);
 
   // calling via new operator inserts into db if needed and returns based on constructor's values. if no values, looks for the set method
   // explicitly retrieving via static get method, only retrieves
@@ -8835,22 +8880,22 @@ var Model = exports.Model = function (_QueryBuilder) {
 
     _classCallCheck(this, Model);
 
-    var _this6 = _possibleConstructorReturn(this, (Model.__proto__ || Object.getPrototypeOf(Model)).call(this));
+    var _this8 = _possibleConstructorReturn(this, (Model.__proto__ || Object.getPrototypeOf(Model)).call(this));
 
-    _this6.relations = {};
-    _this6.handle = _this6.constructor.name.toLowerCase();
-    _this6._initialized = true;
-    _this6._defaults = {};
-    _this6._data = data;
-    _this6.headers = {};
-    Container.add_model(_this6);
-    return _ret = new Proxy(_this6, _this6), _possibleConstructorReturn(_this6, _ret);
+    _this8.relations = {};
+    _this8.handle = _this8.constructor.name.toLowerCase();
+    _this8._initialized = true;
+    _this8._defaults = {};
+    _this8._data = data;
+    _this8.headers = {};
+    Container.add_model(_this8);
+    return _ret = new Proxy(_this8, _this8), _possibleConstructorReturn(_this8, _ret);
   }
 
   _createClass(Model, [{
     key: 'save',
     value: function save() {
-      var _this7 = this;
+      var _this9 = this;
 
       var save_data = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
       var callback = arguments[1];
@@ -8860,15 +8905,15 @@ var Model = exports.Model = function (_QueryBuilder) {
         if (!save_data.id) {
           return reject('no id found!!!', save_data);
         }
-        Container.db.rel.find(_this7.handle, save_data.id).then(function (data) {
-          var model_results = data[_this7.schema.plural];
+        Container.db.rel.find(_this9.handle, save_data.id).then(function (data) {
+          var model_results = data[_this9.schema.plural];
           if (model_results.length) {
             // combine new data with existing model data
             var merged = _g3n1us_helpers2.default.array_merge(model_results[0], save_data);
 
-            resolve(Container.db.rel.save(_this7.handle, merged));
+            resolve(Container.db.rel.save(_this9.handle, merged));
           } else {
-            resolve(Container.db.rel.save(_this7.handle, save_data));
+            resolve(Container.db.rel.save(_this9.handle, save_data));
             /*
                         console.log(this);
                         debugger;
@@ -8886,7 +8931,7 @@ var Model = exports.Model = function (_QueryBuilder) {
   }, {
     key: 'saveMany',
     value: function saveMany() {
-      var _this8 = this;
+      var _this10 = this;
 
       var arr_of_data = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : [];
       var callback = arguments[1];
@@ -8899,7 +8944,7 @@ var Model = exports.Model = function (_QueryBuilder) {
       dedupes = Object.values(dedupes);
 
       var promises = dedupes.map(function (v) {
-        return _this8.save(v);
+        return _this10.save(v);
       });
       var promise = Promise.all(promises).then(function (values) {
         console.log(values); // needs an output return value of some kind. What should this be??
@@ -8929,7 +8974,7 @@ var Model = exports.Model = function (_QueryBuilder) {
   }, {
     key: 'display',
     value: function display() {
-      return '\n    <h1>' + this.name + '</h1>\n    \n    \n    ';
+      return '\n    <h1>' + this.name + '</h1>    \n    ';
     }
 
     // magic methods  
@@ -8953,7 +8998,6 @@ var Model = exports.Model = function (_QueryBuilder) {
       var schema = {
         singular: this.handle,
         plural: (0, _pluralize2.default)(this.handle)
-        //       plural:  pluralizethis.handle + 's', // obviously this is shitty
       };
       if (Object.values(this.relations).length) schema.relations = this.relations;
       return schema;
@@ -8980,7 +9024,7 @@ var Model = exports.Model = function (_QueryBuilder) {
   }]);
 
   return Model;
-}(QueryBuilder);
+}(Relation);
 
 /***/ }),
 /* 142 */

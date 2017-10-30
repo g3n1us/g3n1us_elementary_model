@@ -252,7 +252,6 @@ class QueryBuilder extends App{
 
       		if(query_object.callback)
         		promise.then(query_object.callback);
-      		return promise;
   				
 					resolve(promise);
 				});
@@ -270,9 +269,11 @@ class QueryBuilder extends App{
 
 		return new Promise((resolve, reject) => {
       Container.boot().db.rel.find(this.getProperty('handle'), primary_key).then((data) => { 
+        var pluralname = this.getProperty('schema').plural;
+        var modelized = new this(data[pluralname][0]);
         if(typeof callback === 'function')
-          callback(data[this.getProperty('schema').plural][0]);
-        resolve(data[this.getProperty('schema').plural][0]); 
+          callback(modelized);
+        resolve(modelized); 
       });
 		});
 	}
@@ -282,12 +283,47 @@ class QueryBuilder extends App{
     var query_object = QueryBuilder.parseQueryArgs(arguments);
     // builder is a singleton in order to add subsequent elements to query.
     this.builder = this.builder || new QueryBuilder(this.getProperty('handle'));
-    return this.builder._base_query(query_object);
+    this.builder._base_query(query_object).then((results) => {
+      let pluralname = this.getProperty('schema').plural;
+      let mapped = results[pluralname].map($m => {
+        return new this($m);
+      });
+      
+      return Promise.resolve(mapped);
+      
+    });
+//     return this.builder._base_query(query_object);
   }
 	
 }
 
-export class Model extends QueryBuilder{
+
+export class Relation extends QueryBuilder{
+  constructor(data = {}){
+    super();
+    this.model = null;
+    this.relation_model = null;
+  }
+    
+  hasOne(model){
+    console.log(this.handle, model.getProperty('handle'));
+    var foreign_handle = model.getProperty('handle');
+    this.relations[foreign_handle] = {belongsTo: foreign_handle};
+  }
+
+  hasMany(){
+    
+  }
+  
+  belongsTo(){
+    
+  }
+  
+  
+}
+
+
+export class Model extends Relation{
   // calling via new operator inserts into db if needed and returns based on constructor's values. if no values, looks for the set method
   // explicitly retrieving via static get method, only retrieves
   constructor(data = {}){
@@ -307,7 +343,6 @@ export class Model extends QueryBuilder{
     let schema = {
       singular: this.handle,
       plural:  pluralize(this.handle),
-//       plural:  pluralizethis.handle + 's', // obviously this is shitty
     };
     if(Object.values(this.relations).length)
       schema.relations = this.relations;
@@ -399,9 +434,7 @@ export class Model extends QueryBuilder{
   
   display() {
     return `
-    <h1>${this.name}</h1>
-    
-    
+    <h1>${this.name}</h1>    
     `;
   }  
 
@@ -420,7 +453,5 @@ export class Model extends QueryBuilder{
     }
       
 }
-
-
 
 
