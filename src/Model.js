@@ -11,19 +11,11 @@ import pluralize from 'pluralize';
 PouchDB.plugin(PouchDBFind);
 PouchDB.plugin(RelationalPouch);
 
-export { PouchDB };
-console.log('sdf');
-
-// import Connection from './Connection';
-// import App from './App';
-// import Container from './Container';
-// import QueryBuilder from './QueryBuilder';
+import Connection from './Connection';
+import App from './App';
+import Container from './Container';
+import QueryBuilder from './QueryBuilder';
 import Relation from './Relation';
-// export { Connection }
-// export { App }
-// export { Container }
-// export { QueryBuilder }
-// export { Relation }
 
 
 export class Model extends Relation{
@@ -153,11 +145,11 @@ export class Model extends Relation{
   }  
 
 
+
 // magic methods  
   get(target, prop){
     if(target.relations[prop]){
       if(typeof target.relations[prop] === 'function'){
-        console.log('typeof target.relations[prop]', target.relations[prop]);
         return target.relations[prop];
       }
       else{

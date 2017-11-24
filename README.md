@@ -1,4 +1,4 @@
-# G3N1US ActivePouch
+# G3N1US Elementary Model
 
 ## Get Started
 
@@ -12,7 +12,7 @@ class Animal extends g3n1us.Model{
 ```
 
 ## About
-ActivePouch lets you keep your application's logic separate from your API's schema. API's go away, change, sometimes don't work. Keep your app untethered from your API. 
+G3N1US Elementary Model lets you keep your application's logic separate from your API's schema. API's go away, change, sometimes don't work. Keep your app untethered from your API. 
 
 
 `````javascript
