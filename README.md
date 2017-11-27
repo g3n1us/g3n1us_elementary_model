@@ -62,6 +62,7 @@ Animal.where('legs', '>=', 4).then((response) => {
 });
 ```
 ### Other operators
+
 | ----------- | --------------------------- |
 | `'='`       | equals                      |
 | `'>'`       | greater than                |
