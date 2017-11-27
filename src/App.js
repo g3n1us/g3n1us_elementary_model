@@ -117,3 +117,6 @@ export class App extends Connection{
 	}
 	
 } // close Class
+
+
+export default App;
