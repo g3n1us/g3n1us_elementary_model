@@ -11,12 +11,13 @@ import pluralize from 'pluralize';
 PouchDB.plugin(PouchDBFind);
 PouchDB.plugin(RelationalPouch);
 
-import Connection from './Connection';
-import App from './App';
-import Container from './Container';
-import QueryBuilder from './QueryBuilder';
-import Relation from './Relation';
+import { Connection } from './Connection';
+import { App } from './App';
+import { Container } from './Container';
+import { QueryBuilder } from './QueryBuilder';
+import { Relation } from './Relation';
 
+export { Container };
 
 export class Model extends Relation{
   // calling via new operator inserts into db if needed and returns based on constructor's values. if no values, looks for the set method
@@ -34,6 +35,7 @@ export class Model extends Relation{
   }
   
   
+ 
   get schema(){
     let schema = {
       singular: this.handle,

@@ -1,7 +1,8 @@
-require('es6-promise').polyfill();
-import 'babel-polyfill';
-import $ from 'jquery';
-import helpers from 'g3n1us_helpers';
+// require('es6-promise').polyfill();
+// import 'babel-polyfill';
+// import $ from 'jquery';
+// import helpers from 'g3n1us_helpers';
+/*
 import PouchDB from 'pouchdb';
 import PouchDBFind from 'pouchdb-find';
 import RelationalPouch from 'relational-pouch';
@@ -14,8 +15,10 @@ PouchDB.plugin(RelationalPouch);
 import Connection from './Connection';
 import App from './App';
 import Container from './Container';
-import QueryBuilder from './QueryBuilder';
-import Model from './Model';
+*/
+
+import { QueryBuilder } from './QueryBuilder';
+// import Model from './Model';
 
 export class Relation extends QueryBuilder{
   constructor(data = {}){
