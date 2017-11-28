@@ -175,3 +175,8 @@ export class Model extends Relation{
     }
       
 }
+
+
+if(typeof module == 'object'){
+	module.exports = Model;
+}
