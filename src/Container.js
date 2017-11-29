@@ -2,7 +2,7 @@ import PouchDB from 'pouchdb';
 
 
 // Container holds all persistent data. All methods are static so the overall application state is held in one context
-export default class Container{
+export class Container{
 
   static add_model(model){
     if(!model._initialized){

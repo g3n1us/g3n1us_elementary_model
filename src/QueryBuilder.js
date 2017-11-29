@@ -2,7 +2,7 @@ import { App } from './App';
 
 import { Container } from './Container';
 
-export default class QueryBuilder extends App{
+export class QueryBuilder extends App{
   constructor(type, query){
     super();
     this.type = type;

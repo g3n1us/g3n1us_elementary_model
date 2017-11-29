@@ -20,7 +20,7 @@ import Container from './Container';
 import { QueryBuilder } from './QueryBuilder';
 // import Model from './Model';
 
-export default class Relation extends QueryBuilder{
+export class Relation extends QueryBuilder{
   constructor(data = {}){
     super(data);
     this.model = null;

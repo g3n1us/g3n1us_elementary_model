@@ -2,7 +2,7 @@ import $ from 'jquery';
 
 import { Connection } from './Connection';
 
-export default class App extends Connection{
+export class App extends Connection{
 	constructor({
 			endpoint = 'test.html', 
 			api_key = null,	
