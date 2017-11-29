@@ -19,7 +19,7 @@ import { Relation } from './Relation';
 
 export { Container };
 
-export class Model extends Relation{
+export default class Model extends Relation{
   // calling via new operator inserts into db if needed and returns based on constructor's values. if no values, looks for the set method
   // explicitly retrieving via static get method, only retrieves
   constructor(data = {}){
@@ -177,6 +177,8 @@ export class Model extends Relation{
 }
 
 
+/*
 if(typeof module == 'object'){
 	module.exports = Model;
 }
+*/

@@ -5,8 +5,8 @@ module.exports = {
   output: {
     filename: 'ElementaryModel.js',
     path: path.resolve(__dirname, 'dist'),
-    libraryTarget: "var",
-	library: "g3n1us"
+    libraryTarget: "umd",
+		library: "ElementaryModel"
   },
   module: {
     loaders: [{
