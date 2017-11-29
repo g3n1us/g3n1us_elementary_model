@@ -22,7 +22,7 @@ import Model from './Model';
 */
 
 
-export class Connection{
+export default class Connection{
 	constructor(dbname = 'g3n1us_app'){
 		this.db = new PouchDB(dbname);
 		this.PouchDB = PouchDB;
