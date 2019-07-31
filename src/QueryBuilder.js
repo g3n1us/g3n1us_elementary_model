@@ -17,7 +17,7 @@ export class QueryBuilder extends App{
         this.promise = new Promise(this.resolve, this.reject);
     */
   }
-  
+
   static get operator_map(){
 			let operator_map = {};
 			operator_map['='] = '$eq';
@@ -35,7 +35,7 @@ export class QueryBuilder extends App{
 			operator_map['regex'] = '$regex';
 			return operator_map;
   }
-  
+
   static parseQueryArgs(args){
   	let arg_array = [...args];
   	var query_obj = {
@@ -47,7 +47,7 @@ export class QueryBuilder extends App{
   	var last_arg = arg_array[arg_array.length - 1];
   	if(typeof last_arg === 'function')
     	query_obj.callback = arg_array.splice(-1)[0];
-  		
+
   	if(arg_array.length === 1){
     	query_obj.value = args[0];
   	}
@@ -62,7 +62,7 @@ export class QueryBuilder extends App{
   	}
   	else
     	throw new Error('Number of query arguments is out of range');
-    	
+
 		if(query_obj.operator == 'contains'){
 			query_obj.value = new RegExp('(.*?)'+query_obj.value+'(.*?)');
 		}
@@ -72,10 +72,10 @@ export class QueryBuilder extends App{
 		if(query_obj.operator == 'starts_with'){
 			query_obj.value = new RegExp('^'+query_obj.value+'(.*?)');
 		}
-		
+
 		return query_obj;
   }
-  
+
   /**
   	private base functionality for other query functions
   */
@@ -83,7 +83,7 @@ export class QueryBuilder extends App{
 		return new Promise((resolve, reject) => {
 			let operator_map = QueryBuilder.operator_map;
 			let operator_string = query_object.value instanceof RegExp ? '$regex' : operator_map[query_object.operator];
-			console.log(operator_string); 
+			// console.log(operator_string);
 			var pouch_query_object = {};
 			pouch_query_object[operator_string] = query_object.value;
 			let index_statement = {
@@ -92,7 +92,7 @@ export class QueryBuilder extends App{
 				},
 				type: "json",
 			};
-			
+
 			Container.boot().db.createIndex(index_statement).then(() => {
 				var query = {selector: {}};
 				query.selector['data.'+ query_object.key] = pouch_query_object;
@@ -101,33 +101,35 @@ export class QueryBuilder extends App{
 
       		if(query_object.callback)
         		promise.then(query_object.callback);
-  				
+
 					resolve(promise);
 				});
-			});		
+			});
 		});
-	}	
-	
-	
+	}
+
+
 	// This gets called by Model directly. TODO need to change this!
 	static find(primary_key, keyname = 'id'){
 		if(!primary_key) throw new Error('You must pass an id to this function.');
-  	var last_arg = arguments[arguments.length - 1];
-  	if(typeof last_arg === 'function')
-    	var callback = last_arg;
-
+        var last_arg = arguments[arguments.length - 1];
+        if(typeof last_arg === 'function'){
+        	let callback = last_arg;
+        }
 		return new Promise((resolve, reject) => {
-      Container.boot().db.rel.find(this.getProperty('handle'), primary_key).then((data) => { 
-        var pluralname = this.getProperty('schema').plural;
-        var modelized = new this(data[pluralname][0]);
-        if(typeof callback === 'function')
-          callback(modelized);
-        resolve(modelized); 
-      });
+            Container.boot().db.rel.find(this.getProperty('handle'), primary_key).then((data) => {
+                var pluralname = this.getProperty('schema').plural;
+                var modelized = new this(data[pluralname][0]);
+                if(typeof callback === 'function'){
+                    callback(modelized);
+                }
+
+                resolve(modelized);
+            });
 		});
 	}
-	
-	
+
+
   static where(key = 'id', value = null, operator = '=', callback){
     var query_object = QueryBuilder.parseQueryArgs(arguments);
     // builder is a singleton in order to add subsequent elements to query.
@@ -137,11 +139,11 @@ export class QueryBuilder extends App{
       let mapped = results[pluralname].map($m => {
         return new this($m);
       });
-      
+
       return Promise.resolve(mapped);
-      
+
     });
 //     return this.builder._base_query(query_object);
   }
-	
+
 }
