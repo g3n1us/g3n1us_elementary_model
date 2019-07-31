@@ -2,7 +2,10 @@
   "name": "g3n1us_elementary_model",
   "version": "0.1.10",
   "description": "Import APIs into a local PouchDB and provide querying and models",
-  "repository": {"type": "git", "url": "https://github.com/g3n1us/g3n1us_elementary_model.git"},
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/g3n1us/g3n1us_elementary_model.git"
+  },
   "main": "dist/ElementaryModel.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
